@@ -1,0 +1,83 @@
+## Mixup
+import numpy as np
+
+def mixup_data_classwise(X, y, alpha=0.4, n_synthetic=1000):
+    """
+    Generate synthetic samples via Mixup only mixing samples within the same class.
+    
+    Args:
+      X: numpy array of shape (N_samples, N_features)
+      y: numpy array of shape (N_samples, N_classes) one-hot encoded or probability labels
+      alpha: Mixup beta distribution parameter
+      n_synthetic: number of synthetic samples to generate
+    
+    Returns:
+      X_aug: augmented data (original + synthetic)
+      y_aug: augmented labels (original + synthetic)
+    """
+    N = X.shape[0]
+    
+    # If y is one-hot or soft labels, convert to class indices
+    if y.ndim > 1 and y.shape[1] > 1:
+        class_indices = np.argmax(y, axis=1)
+    else:
+        class_indices = y.flatten()
+    
+    synthetic_X = []
+    synthetic_y = []
+    
+    unique_classes = np.unique(class_indices)
+    
+    # Build dict of indices per class
+    class_to_indices = {cls: np.where(class_indices == cls)[0] for cls in unique_classes}
+    
+    for _ in range(n_synthetic):
+        # Randomly pick a class
+        cls = np.random.choice(unique_classes)
+        
+        indices = class_to_indices[cls]
+        if len(indices) < 2:
+            # Not enough samples to mix in this class, skip iteration
+            continue
+        
+        # Randomly choose two different samples from the same class
+        i1, i2 = np.random.choice(indices, size=2, replace=False)
+        
+        lam = np.random.beta(alpha, alpha)
+        
+        x_mix = lam * X[i1] + (1 - lam) * X[i2]
+        y_mix = lam * y[i1] + (1 - lam) * y[i2]
+        
+        synthetic_X.append(x_mix)
+        synthetic_y.append(y_mix)
+    
+    synthetic_X = np.stack(synthetic_X)
+    synthetic_y = np.stack(synthetic_y)
+    
+    X_aug = np.concatenate([X, synthetic_X], axis=0)
+    y_aug = np.concatenate([y, synthetic_y], axis=0)
+    
+    return X_aug, y_aug
+
+## Gene drop out
+def input_dropout(x, drop_prob=0.1):
+    if not model.training:  # Only apply during training
+        return x
+    mask = (torch.rand_like(x) > drop_prob).float()
+    return x * mask
+
+
+## Scaling/magnitude perturbation
+import numpy as np
+
+def magnitude_perturbation(X, epsilon=0.1):
+    """
+    X: numpy array of shape (num_cells, num_genes)
+    epsilon: range for uniform scaling factor (e.g. 0.1 means scaling from 0.9 to 1.1)
+    """
+    num_cells, num_genes = X.shape
+    # Generate a scaling factor for each cell
+    scales = np.random.uniform(1 - epsilon, 1 + epsilon, size=(num_cells, 1))
+    X_scaled = X * scales
+    return X_scaled
+
